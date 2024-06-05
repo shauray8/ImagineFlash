@@ -204,10 +204,10 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
         if trained_betas is not None:
             self.betas = torch.tensor(trained_betas, dtype=torch.float32)
         elif beta_schedule == "linear":
-            self.betas = torch.linspace(beta_start, beta_end, num_train_timesteps, dtype=torch.float32)
+            self.betas = torch.linspace(beta_start, beta_end, num_train_timesteps+1, dtype=torch.float32)
         elif beta_schedule == "scaled_linear":
             # this schedule is very specific to the latent diffusion model.
-            self.betas = torch.linspace(beta_start**0.5, beta_end**0.5, num_train_timesteps, dtype=torch.float32) ** 2
+            self.betas = torch.linspace(beta_start**0.5, beta_end**0.5, num_train_timesteps+1, dtype=torch.float32) ** 2
         elif beta_schedule == "squaredcos_cap_v2":
             # Glide cosine schedule
             self.betas = betas_for_alpha_bar(num_train_timesteps)
@@ -447,6 +447,11 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
 
         # 7. compute x_t without "random noise" of formula (12) from https://arxiv.org/pdf/2010.02502.pdf
         prev_sample = alpha_prod_t_prev ** (0.5) * pred_original_sample + pred_sample_direction
+
+        # 8. set e_theta at t=T to true noise
+        if timestep == self.config.num_train_timesteps:
+            pred_sample_direction_T = (1 - alpha_prod_t_prev - std_dev_t**2) ** (0.5) * sample
+            prev_sample = alpha_prod_t_prev ** (0.5) * pred_original_sample + pred_sample_direction_T
 
         if eta > 0:
             if variance_noise is not None and generator is not None:
